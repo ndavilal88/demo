@@ -1,0 +1,32 @@
+workflow:
+  version: 1
+  name: agenda-demo
+
+phases:
+  - id: diseno
+    runtime: claude-code
+    instructions: |
+      Diseña una agenda de contactos mínima, de línea de comandos, en Node.js.
+      Escribe el diseño en un fichero DISENO.md del directorio actual, con:
+        - qué datos guarda cada contacto (nombre, teléfono, email)
+        - dónde los guarda (un fichero JSON llamado agenda.json)
+        - qué comandos ofrece: añadir, listar, buscar por nombre, borrar
+      No escribas código todavía. Solo DISENO.md.
+    permissions: [Read, Write, Edit]
+    validators: [hay-diseno]
+    gate:
+      human: true
+
+  - id: implementacion
+    requires: [diseno]
+    runtime: claude-code
+    instructions: |
+      Lee DISENO.md e implementa esa agenda en un fichero agenda.js del
+      directorio actual, usando solo los modulos que trae Node por defecto.
+      Tiene que ejecutarse con `node agenda.js <comando>` y no romperse
+      si agenda.json todavia no existe.
+      No cambies DISENO.md.
+    permissions: [Read, Write, Edit]
+    validators: [compila-agenda]
+    gate:
+      human: true
