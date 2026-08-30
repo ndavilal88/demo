@@ -1,6 +1,6 @@
 workflow:
   version: 1
-  name: sala-de-agentes
+  name: agenda-personal
 
 # Pipeline de ingenieria AI-First.
 #
@@ -29,6 +29,11 @@ workflow:
 # modela amenazas sobre el diseno, antes de que exista codigo, y
 # `seguridad-revision` revisa el codigo que ya existe. Los ids son unicos, de
 # ahi el nombre largo del segundo.
+#
+# EL AVISO DEL WORKSPACE va en las diez fases y no es decorativo: el agente
+# trabaja en un worktree y el perfil hermetico confina las herramientas de
+# fichero a el. Sin decirlo, el agente sale a explorar la raiz del proyecto, se
+# le deniega y la fase muere — medido, seis intentos seguidos.
 
 phases:
   - id: requisitos
@@ -37,22 +42,26 @@ phases:
     instructions: |
       Define QUE hay que construir, sin decidir todavia COMO.
 
-      El producto es una SALA DE AGENTES: varios agentes en Node.js que se pasan
-      mensajes por un bus en memoria para resolver una tarea, y una interfaz
-      visual en el navegador que deja ver que hizo cada uno.
+      El producto es una AGENDA PERSONAL: una aplicacion en Node.js para
+      apuntar citas —fecha, hora, titulo y notas—, con una interfaz visual en el
+      navegador que las muestra por dia.
 
       Escribe `docs/requisitos.md` con estas secciones, en este orden:
         ## Problema
-        ## Actores          (los agentes y la persona que mira la interfaz)
+        ## Actores          (quien usa la agenda y para que)
         ## Requisitos funcionales     (numerados RF-1, RF-2, ...)
         ## Requisitos no funcionales  (numerados RNF-1, RNF-2, ...)
         ## Fuera de alcance
+
+      Como minimo tiene que poder: anadir una cita, listar las de un dia,
+      buscar por texto y borrar una. Y decir que pasa con los casos feos: dos
+      citas a la misma hora, una fecha que no existe, un titulo vacio.
 
       RESTRICCIONES QUE MANDAN sobre todo lo demas, y que tienen que quedar
       escritas en los requisitos no funcionales:
         - Solo la biblioteca estandar de Node. Cero dependencias, cero npm install.
         - La interfaz es un fichero HTML estatico que se abre con doble clic.
-        - Nada de red: los agentes no llaman a ningun servicio.
+        - Nada de red ni de nube: las citas viven en un fichero JSON del proyecto.
 
       No escribas codigo en esta fase.
 
@@ -73,17 +82,17 @@ phases:
 
       Escribe `docs/arquitectura.md` con:
         ## Componentes            (que ficheros existiran y de que se ocupa cada uno)
-        ## Bus de mensajes        (la forma exacta de un mensaje, campo a campo)
-        ## Agentes                (uno por seccion: que escucha, que produce)
-        ## Flujo de una tarea     (paso a paso, de principio a fin)
+        ## Modelo de una cita     (la forma exacta, campo a campo, con su tipo)
+        ## Operaciones            (anadir, listar por dia, buscar, borrar)
+        ## Almacenamiento         (como se guarda y que pasa si el fichero no existe)
         ## Estado para la interfaz (el JSON que la interfaz va a leer)
 
       La estructura de ficheros que hay que respetar es esta:
-        src/bus.js          el bus de mensajes en memoria
-        src/agentes/*.js    un fichero por agente
-        src/main.js         arranca la sala, corre una tarea y escribe web/estado.json
+        src/agenda.js       las reglas: anadir, listar, buscar, borrar, validar
+        src/almacen.js      leer y escribir datos/agenda.json
+        src/main.js         siembra unas citas de ejemplo y escribe web/eventos.json
         web/index.html      la interfaz visual
-        web/estado.json     lo que main.js produce y la interfaz lee
+        web/eventos.json    lo que main.js produce y la interfaz lee
 
       No escribas codigo todavia.
 
@@ -105,11 +114,14 @@ phases:
       Escribe `docs/ux.md` con:
         ## Que tiene que entender de un vistazo
         ## Pantalla       (que hay en la pagina, de arriba abajo)
-        ## Estados        (cargando, sala vacia, tarea en curso, terminada, error)
-        ## Accesibilidad  (contraste, tamaños, que funcione sin raton)
+        ## Estados        (cargando, dia sin citas, dia con citas, error al cargar)
+        ## Accesibilidad  (contraste, tamanos, que funcione sin raton)
 
       La interfaz es un solo `web/index.html` sin dependencias ni build: HTML,
       CSS y JavaScript en el mismo fichero. Describela con ese limite puesto.
+
+      Piensa en lo aburrido y necesario: como se ve una cita, como se distingue
+      la de ahora de la de la semana que viene, y que pasa cuando no hay ninguna.
 
       No escribas el HTML todavia: aqui se decide que se ve, no como se codifica.
 
@@ -129,16 +141,16 @@ phases:
       Lee `docs/requisitos.md` y modela las amenazas ANTES de que exista codigo.
 
       Escribe `docs/amenazas.md` con:
-        ## Superficie    (por donde entran datos: ficheros, la tarea, el navegador)
+        ## Superficie    (por donde entran datos: el fichero de citas, lo que se teclea, el navegador)
         ## Amenazas      (una por seccion, numeradas A-1, A-2, ...)
         ## Mitigaciones  (cada una citando la amenaza que cierra)
         ## Lo que NO se protege   (dicho a proposito, no escondido)
 
-      Al menos estas tienen que estar tratadas, porque son las que este diseño
+      Al menos estas tienen que estar tratadas, porque son las que esta agenda
       se puede encontrar de verdad:
-        - un mensaje del bus con campos que nadie valida
-        - `web/estado.json` con contenido que acaba dentro del HTML
-        - un agente que se queda en bucle y no cede el turno
+        - una cita con campos que nadie valida, o con una fecha que no existe
+        - `datos/agenda.json` corrupto o con contenido que no escribio la app
+        - texto de una cita que acaba dentro del HTML de la interfaz
 
       Prohibido en el codigo que vendra despues, y esta fase tiene que dejarlo
       escrito: eval, new Function, child_process y cualquier llamada de red.
@@ -156,21 +168,22 @@ phases:
     requires: [arquitectura, ux, seguridad]
     runtime: claude-code
     instructions: |
-      Construye la sala siguiendo `docs/arquitectura.md`, `docs/ux.md` y
+      Construye la agenda siguiendo `docs/arquitectura.md`, `docs/ux.md` y
       `docs/amenazas.md`.
 
       Escribe:
-        src/bus.js
-        src/agentes/*.js   (al menos tres: planificador, ejecutor y revisor)
-        src/main.js        que al ejecutarse escribe `web/estado.json`
-        web/index.html     la interfaz visual, un solo fichero
+        src/agenda.js     anadir, listar por dia, buscar, borrar y VALIDAR
+        src/almacen.js    leer y escribir datos/agenda.json
+        src/main.js       que al ejecutarse escribe `web/eventos.json`
+        web/index.html    la interfaz visual, un solo fichero
 
       REGLAS QUE NO SE NEGOCIAN:
         - Solo biblioteca estandar de Node. Ningun paquete externo.
         - Nada de eval, new Function, child_process ni red.
-        - La interfaz pinta lo que lee de `web/estado.json` con textContent,
+        - La interfaz pinta lo que lee de `web/eventos.json` con textContent,
           nunca con innerHTML sobre datos.
-        - `node src/main.js` tiene que terminar solo, sin quedarse esperando.
+        - `node src/main.js` tiene que terminar solo, sin quedarse esperando, y
+          funcionar aunque `datos/agenda.json` no exista todavia.
 
       TU NO PUEDES EJECUTAR NADA en esta fase: no tienes shell. Escribe el codigo
       como si fuera a correr — de ejecutarlo se encarga la comprobacion del gate.
@@ -180,7 +193,7 @@ phases:
       un intento de salir se deniega y tumba la fase. Usa siempre rutas
       RELATIVAS.
     permissions: [Read, Write, Edit, Glob, Grep]
-    validators: [compila-agentes]
+    validators: [compila-agenda]
     gate:
       human: true
 
@@ -192,15 +205,18 @@ phases:
       Node: `node:test` y `node:assert/strict`.
 
       Deja los ficheros en `test/`, con nombre `*.test.js`. Cubre al menos:
-        - el bus entrega un mensaje a quien lo escucha, y no a quien no
-        - un mensaje con campos que faltan se rechaza y no rompe la sala
-        - una tarea completa recorre los tres agentes y deja estado para la interfaz
+        - una cita valida se anade y aparece al listar su dia
+        - una cita con fecha imposible o titulo vacio se RECHAZA
+        - buscar por texto encuentra la que es y no las demas
+        - borrar quita solo esa, y borrar algo que no existe no revienta
+        - leer un `datos/agenda.json` que no existe da una agenda vacia
 
       Que las pruebas FALLEN si el codigo esta mal es el objetivo: no escribas
       pruebas que pasen sin mirar nada. Si al escribirlas descubres un fallo en
       `src/`, arreglalo.
 
-      Tampoco aqui puedes ejecutar: las corre el gate con `node --test`, que descubre `test/*.test.js` el solo.
+      Tampoco aqui puedes ejecutar: las corre el gate con `node --test`, que
+      descubre `test/*.test.js` el solo.
 
       TODO LO QUE NECESITAS ESTA EN ESTE DIRECTORIO Y POR DEBAJO. No mires ni
       escribas fuera de el: las herramientas de fichero estan confinadas aqui, y
@@ -217,9 +233,10 @@ phases:
     instructions: |
       Mide, no opines.
 
-      Escribe `bench/bench.js`: solo biblioteca estandar, que corra la sala con
-      carga suficiente para que se note, mida con `performance.now()` y escriba
-      el resultado por stdout. Tiene que terminar solo y salir con codigo 0.
+      Escribe `bench/bench.js`: solo biblioteca estandar, que llene una agenda
+      con muchas citas —miles—, mida con `performance.now()` cuanto tarda
+      listar un dia y buscar por texto, y escriba el resultado por stdout. Tiene
+      que terminar solo y salir con codigo 0.
 
       Escribe `docs/performance.md` con:
         ## Que se mide
