@@ -55,6 +55,11 @@ phases:
         - Nada de red: los agentes no llaman a ningun servicio.
 
       No escribas codigo en esta fase.
+
+      TODO LO QUE NECESITAS ESTA EN ESTE DIRECTORIO Y POR DEBAJO. No mires ni
+      escribas fuera de el: las herramientas de fichero estan confinadas aqui, y
+      un intento de salir se deniega y tumba la fase. Usa siempre rutas
+      RELATIVAS.
     permissions: [Read, Write, Edit, Glob, Grep]
     validators: [hay-requisitos]
     gate:
@@ -81,6 +86,11 @@ phases:
         web/estado.json     lo que main.js produce y la interfaz lee
 
       No escribas codigo todavia.
+
+      TODO LO QUE NECESITAS ESTA EN ESTE DIRECTORIO Y POR DEBAJO. No mires ni
+      escribas fuera de el: las herramientas de fichero estan confinadas aqui, y
+      un intento de salir se deniega y tumba la fase. Usa siempre rutas
+      RELATIVAS.
     permissions: [Read, Write, Edit, Glob, Grep]
     validators: [hay-arquitectura]
     gate:
@@ -102,6 +112,11 @@ phases:
       CSS y JavaScript en el mismo fichero. Describela con ese limite puesto.
 
       No escribas el HTML todavia: aqui se decide que se ve, no como se codifica.
+
+      TODO LO QUE NECESITAS ESTA EN ESTE DIRECTORIO Y POR DEBAJO. No mires ni
+      escribas fuera de el: las herramientas de fichero estan confinadas aqui, y
+      un intento de salir se deniega y tumba la fase. Usa siempre rutas
+      RELATIVAS.
     permissions: [Read, Write, Edit, Glob, Grep]
     validators: [hay-ux]
     gate:
@@ -127,6 +142,11 @@ phases:
 
       Prohibido en el codigo que vendra despues, y esta fase tiene que dejarlo
       escrito: eval, new Function, child_process y cualquier llamada de red.
+
+      TODO LO QUE NECESITAS ESTA EN ESTE DIRECTORIO Y POR DEBAJO. No mires ni
+      escribas fuera de el: las herramientas de fichero estan confinadas aqui, y
+      un intento de salir se deniega y tumba la fase. Usa siempre rutas
+      RELATIVAS.
     permissions: [Read, Write, Edit, Glob, Grep]
     validators: [hay-amenazas]
     gate:
@@ -154,6 +174,11 @@ phases:
 
       TU NO PUEDES EJECUTAR NADA en esta fase: no tienes shell. Escribe el codigo
       como si fuera a correr — de ejecutarlo se encarga la comprobacion del gate.
+
+      TODO LO QUE NECESITAS ESTA EN ESTE DIRECTORIO Y POR DEBAJO. No mires ni
+      escribas fuera de el: las herramientas de fichero estan confinadas aqui, y
+      un intento de salir se deniega y tumba la fase. Usa siempre rutas
+      RELATIVAS.
     permissions: [Read, Write, Edit, Glob, Grep]
     validators: [compila-agentes]
     gate:
@@ -176,6 +201,11 @@ phases:
       `src/`, arreglalo.
 
       Tampoco aqui puedes ejecutar: las corre el gate con `node --test`, que descubre `test/*.test.js` el solo.
+
+      TODO LO QUE NECESITAS ESTA EN ESTE DIRECTORIO Y POR DEBAJO. No mires ni
+      escribas fuera de el: las herramientas de fichero estan confinadas aqui, y
+      un intento de salir se deniega y tumba la fase. Usa siempre rutas
+      RELATIVAS.
     permissions: [Read, Write, Edit, Glob, Grep]
     validators: [pasan-pruebas]
     gate:
@@ -196,6 +226,11 @@ phases:
         ## Como se mide   (el comando exacto: node bench/bench.js)
         ## Resultados     (los numeros que espera ver quien lo ejecute)
         ## Que haria falta para ir mas rapido
+
+      TODO LO QUE NECESITAS ESTA EN ESTE DIRECTORIO Y POR DEBAJO. No mires ni
+      escribas fuera de el: las herramientas de fichero estan confinadas aqui, y
+      un intento de salir se deniega y tumba la fase. Usa siempre rutas
+      RELATIVAS.
     permissions: [Read, Write, Edit, Glob, Grep]
     validators: [mide-performance]
     gate:
@@ -216,6 +251,11 @@ phases:
 
       Si encuentras algo, ARREGLALO en `src/` y dilo en el documento. Un informe
       que describe un agujero sin cerrarlo no es una revision, es una nota.
+
+      TODO LO QUE NECESITAS ESTA EN ESTE DIRECTORIO Y POR DEBAJO. No mires ni
+      escribas fuera de el: las herramientas de fichero estan confinadas aqui, y
+      un intento de salir se deniega y tumba la fase. Usa siempre rutas
+      RELATIVAS.
     permissions: [Read, Write, Edit, Glob, Grep]
     validators: [revision-seguridad]
     gate:
@@ -234,6 +274,11 @@ phases:
       Los comandos que escribas tienen que ser los que de verdad funcionan con
       los ficheros que hay. Un README con un comando que no existe es peor que no
       tener README.
+
+      TODO LO QUE NECESITAS ESTA EN ESTE DIRECTORIO Y POR DEBAJO. No mires ni
+      escribas fuera de el: las herramientas de fichero estan confinadas aqui, y
+      un intento de salir se deniega y tumba la fase. Usa siempre rutas
+      RELATIVAS.
     permissions: [Read, Write, Edit, Glob, Grep]
     validators: [hay-docs]
     gate:
@@ -252,6 +297,11 @@ phases:
         ## Riesgos que quedan abiertos
 
       No adornes: si algo quedo a medias, esta es la fase en la que se dice.
+
+      TODO LO QUE NECESITAS ESTA EN ESTE DIRECTORIO Y POR DEBAJO. No mires ni
+      escribas fuera de el: las herramientas de fichero estan confinadas aqui, y
+      un intento de salir se deniega y tumba la fase. Usa siempre rutas
+      RELATIVAS.
     permissions: [Read, Write, Edit, Glob, Grep]
     validators: [listo-para-entregar]
     gate:
