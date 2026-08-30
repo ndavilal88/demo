@@ -1,32 +1,258 @@
 workflow:
   version: 1
-  name: agenda-demo
+  name: sala-de-agentes
+
+# Pipeline de ingenieria AI-First.
+#
+#                         ┌── arquitectura ───┐
+#                         │                   │
+#  requisitos ────────────┼── ux ─────────────┼── implementacion
+#                         │                   │
+#                         └── seguridad ──────┘
+#                                                     │
+#                                                     ▼
+#                                                  pruebas
+#                                                     │
+#                         ┌───────────────────────────┼─────────┐
+#                         ▼                           ▼         ▼
+#                   performance          seguridad-revision   docs
+#                         └───────────────────────────┬─────────┘
+#                                                     ▼
+#                                                  entrega
+#
+# El DAG es real: lo declara `requires`, no el orden del fichero. AIF Local
+# ejecuta UNA fase a la vez y toma la primera lista en orden de declaracion
+# (D15), asi que los dos abanicos se recorren de arriba abajo — pero ninguna
+# fase empieza sin que TODAS las suyas esten aprobadas.
+#
+# Hay DOS fases de seguridad porque son dos trabajos distintos: `seguridad`
+# modela amenazas sobre el diseno, antes de que exista codigo, y
+# `seguridad-revision` revisa el codigo que ya existe. Los ids son unicos, de
+# ahi el nombre largo del segundo.
 
 phases:
-  - id: diseno
+  - id: requisitos
+    requires: []
     runtime: claude-code
     instructions: |
-      Diseña una agenda de contactos mínima, de línea de comandos, en Node.js.
-      Escribe el diseño en un fichero DISENO.md del directorio actual, con:
-        - qué datos guarda cada contacto (nombre, teléfono, email)
-        - dónde los guarda (un fichero JSON llamado agenda.json)
-        - qué comandos ofrece: añadir, listar, buscar por nombre, borrar
-      No escribas código todavía. Solo DISENO.md.
-    permissions: [Read, Write, Edit]
-    validators: [hay-diseno]
+      Define QUE hay que construir, sin decidir todavia COMO.
+
+      El producto es una SALA DE AGENTES: varios agentes en Node.js que se pasan
+      mensajes por un bus en memoria para resolver una tarea, y una interfaz
+      visual en el navegador que deja ver que hizo cada uno.
+
+      Escribe `docs/requisitos.md` con estas secciones, en este orden:
+        ## Problema
+        ## Actores          (los agentes y la persona que mira la interfaz)
+        ## Requisitos funcionales     (numerados RF-1, RF-2, ...)
+        ## Requisitos no funcionales  (numerados RNF-1, RNF-2, ...)
+        ## Fuera de alcance
+
+      RESTRICCIONES QUE MANDAN sobre todo lo demas, y que tienen que quedar
+      escritas en los requisitos no funcionales:
+        - Solo la biblioteca estandar de Node. Cero dependencias, cero npm install.
+        - La interfaz es un fichero HTML estatico que se abre con doble clic.
+        - Nada de red: los agentes no llaman a ningun servicio.
+
+      No escribas codigo en esta fase.
+    permissions: [Read, Write, Edit, Glob, Grep]
+    validators: [hay-requisitos]
+    gate:
+      human: true
+
+  - id: arquitectura
+    requires: [requisitos]
+    runtime: claude-code
+    instructions: |
+      Lee `docs/requisitos.md` y decide COMO se construye.
+
+      Escribe `docs/arquitectura.md` con:
+        ## Componentes            (que ficheros existiran y de que se ocupa cada uno)
+        ## Bus de mensajes        (la forma exacta de un mensaje, campo a campo)
+        ## Agentes                (uno por seccion: que escucha, que produce)
+        ## Flujo de una tarea     (paso a paso, de principio a fin)
+        ## Estado para la interfaz (el JSON que la interfaz va a leer)
+
+      La estructura de ficheros que hay que respetar es esta:
+        src/bus.js          el bus de mensajes en memoria
+        src/agentes/*.js    un fichero por agente
+        src/main.js         arranca la sala, corre una tarea y escribe web/estado.json
+        web/index.html      la interfaz visual
+        web/estado.json     lo que main.js produce y la interfaz lee
+
+      No escribas codigo todavia.
+    permissions: [Read, Write, Edit, Glob, Grep]
+    validators: [hay-arquitectura]
+    gate:
+      human: true
+
+  - id: ux
+    requires: [requisitos]
+    runtime: claude-code
+    instructions: |
+      Lee `docs/requisitos.md` y define QUE VE la persona.
+
+      Escribe `docs/ux.md` con:
+        ## Que tiene que entender de un vistazo
+        ## Pantalla       (que hay en la pagina, de arriba abajo)
+        ## Estados        (cargando, sala vacia, tarea en curso, terminada, error)
+        ## Accesibilidad  (contraste, tamaños, que funcione sin raton)
+
+      La interfaz es un solo `web/index.html` sin dependencias ni build: HTML,
+      CSS y JavaScript en el mismo fichero. Describela con ese limite puesto.
+
+      No escribas el HTML todavia: aqui se decide que se ve, no como se codifica.
+    permissions: [Read, Write, Edit, Glob, Grep]
+    validators: [hay-ux]
+    gate:
+      human: true
+
+  - id: seguridad
+    requires: [requisitos]
+    runtime: claude-code
+    instructions: |
+      Lee `docs/requisitos.md` y modela las amenazas ANTES de que exista codigo.
+
+      Escribe `docs/amenazas.md` con:
+        ## Superficie    (por donde entran datos: ficheros, la tarea, el navegador)
+        ## Amenazas      (una por seccion, numeradas A-1, A-2, ...)
+        ## Mitigaciones  (cada una citando la amenaza que cierra)
+        ## Lo que NO se protege   (dicho a proposito, no escondido)
+
+      Al menos estas tienen que estar tratadas, porque son las que este diseño
+      se puede encontrar de verdad:
+        - un mensaje del bus con campos que nadie valida
+        - `web/estado.json` con contenido que acaba dentro del HTML
+        - un agente que se queda en bucle y no cede el turno
+
+      Prohibido en el codigo que vendra despues, y esta fase tiene que dejarlo
+      escrito: eval, new Function, child_process y cualquier llamada de red.
+    permissions: [Read, Write, Edit, Glob, Grep]
+    validators: [hay-amenazas]
     gate:
       human: true
 
   - id: implementacion
-    requires: [diseno]
+    requires: [arquitectura, ux, seguridad]
     runtime: claude-code
     instructions: |
-      Lee DISENO.md e implementa esa agenda en un fichero agenda.js del
-      directorio actual, usando solo los modulos que trae Node por defecto.
-      Tiene que ejecutarse con `node agenda.js <comando>` y no romperse
-      si agenda.json todavia no existe.
-      No cambies DISENO.md.
-    permissions: [Read, Write, Edit]
-    validators: [compila-agenda]
+      Construye la sala siguiendo `docs/arquitectura.md`, `docs/ux.md` y
+      `docs/amenazas.md`.
+
+      Escribe:
+        src/bus.js
+        src/agentes/*.js   (al menos tres: planificador, ejecutor y revisor)
+        src/main.js        que al ejecutarse escribe `web/estado.json`
+        web/index.html     la interfaz visual, un solo fichero
+
+      REGLAS QUE NO SE NEGOCIAN:
+        - Solo biblioteca estandar de Node. Ningun paquete externo.
+        - Nada de eval, new Function, child_process ni red.
+        - La interfaz pinta lo que lee de `web/estado.json` con textContent,
+          nunca con innerHTML sobre datos.
+        - `node src/main.js` tiene que terminar solo, sin quedarse esperando.
+
+      TU NO PUEDES EJECUTAR NADA en esta fase: no tienes shell. Escribe el codigo
+      como si fuera a correr — de ejecutarlo se encarga la comprobacion del gate.
+    permissions: [Read, Write, Edit, Glob, Grep]
+    validators: [compila-agentes]
+    gate:
+      human: true
+
+  - id: pruebas
+    requires: [implementacion]
+    runtime: claude-code
+    instructions: |
+      Escribe pruebas de verdad para lo que hay en `src/`, con el runner que trae
+      Node: `node:test` y `node:assert/strict`.
+
+      Deja los ficheros en `test/`, con nombre `*.test.js`. Cubre al menos:
+        - el bus entrega un mensaje a quien lo escucha, y no a quien no
+        - un mensaje con campos que faltan se rechaza y no rompe la sala
+        - una tarea completa recorre los tres agentes y deja estado para la interfaz
+
+      Que las pruebas FALLEN si el codigo esta mal es el objetivo: no escribas
+      pruebas que pasen sin mirar nada. Si al escribirlas descubres un fallo en
+      `src/`, arreglalo.
+
+      Tampoco aqui puedes ejecutar: las corre el gate con `node --test`, que descubre `test/*.test.js` el solo.
+    permissions: [Read, Write, Edit, Glob, Grep]
+    validators: [pasan-pruebas]
+    gate:
+      human: true
+
+  - id: performance
+    requires: [pruebas]
+    runtime: claude-code
+    instructions: |
+      Mide, no opines.
+
+      Escribe `bench/bench.js`: solo biblioteca estandar, que corra la sala con
+      carga suficiente para que se note, mida con `performance.now()` y escriba
+      el resultado por stdout. Tiene que terminar solo y salir con codigo 0.
+
+      Escribe `docs/performance.md` con:
+        ## Que se mide
+        ## Como se mide   (el comando exacto: node bench/bench.js)
+        ## Resultados     (los numeros que espera ver quien lo ejecute)
+        ## Que haria falta para ir mas rapido
+    permissions: [Read, Write, Edit, Glob, Grep]
+    validators: [mide-performance]
+    gate:
+      human: true
+
+  - id: seguridad-revision
+    requires: [pruebas]
+    runtime: claude-code
+    instructions: |
+      Vuelve a `docs/amenazas.md` y revisa contra el el codigo que YA existe.
+
+      Escribe `docs/seguridad-revision.md` con:
+        ## Amenaza por amenaza   (cita A-1, A-2, ... y di si esta cerrada, con el
+                                  fichero y la linea donde se ve)
+        ## Lo que encontre       (si no encontraste nada, dilo y explica que
+                                  buscaste; no inventes hallazgos)
+        ## Lo que sigue abierto
+
+      Si encuentras algo, ARREGLALO en `src/` y dilo en el documento. Un informe
+      que describe un agujero sin cerrarlo no es una revision, es una nota.
+    permissions: [Read, Write, Edit, Glob, Grep]
+    validators: [revision-seguridad]
+    gate:
+      human: true
+
+  - id: docs
+    requires: [pruebas]
+    runtime: claude-code
+    instructions: |
+      Escribe el `README.md` que necesita alguien que llega hoy al proyecto:
+        ## Que es esto
+        ## Como se ejecuta   (los comandos exactos, incluido como abrir la interfaz)
+        ## Como esta hecho   (resumen corto, remitiendo a docs/arquitectura.md)
+        ## Como se prueba    (node --test)
+
+      Los comandos que escribas tienen que ser los que de verdad funcionan con
+      los ficheros que hay. Un README con un comando que no existe es peor que no
+      tener README.
+    permissions: [Read, Write, Edit, Glob, Grep]
+    validators: [hay-docs]
+    gate:
+      human: true
+
+  - id: entrega
+    requires: [performance, seguridad-revision, docs]
+    runtime: claude-code
+    instructions: |
+      Cierra el paquete. Escribe `docs/entrega.md` con:
+        ## Que se entrega      (la lista de ficheros, uno por linea)
+        ## Como se comprueba   (los comandos que cualquiera puede correr)
+        ## Estado de cada fase (requisitos, arquitectura, ux, seguridad,
+                                implementacion, pruebas, performance,
+                                seguridad-revision, docs — y que dejo cada una)
+        ## Riesgos que quedan abiertos
+
+      No adornes: si algo quedo a medias, esta es la fase en la que se dice.
+    permissions: [Read, Write, Edit, Glob, Grep]
+    validators: [listo-para-entregar]
     gate:
       human: true
