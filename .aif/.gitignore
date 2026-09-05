@@ -1,0 +1,16 @@
+# Escrito a mano, y AIF lo respeta: solo crea el suyo si no hay ninguno.
+#
+# El de AIF ignora `.aif/` ENTERA con un `*`, que es correcto para el estado y el
+# trabajo en curso — pero se llevaria por delante el CATALOGO GOBERNADO, que es
+# contenido del proyecto y tiene que viajar en git: sin el, clonar el repositorio
+# deja un proyecto sin skills, sin validators y sin material que registrar.
+#
+# Regla: se ignora lo que genera AIF; se versiona lo que escribe una persona.
+
+state/
+material/
+workspaces/
+runner.lock
+*.db
+*.db-wal
+*.db-shm

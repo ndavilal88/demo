@@ -1,0 +1,47 @@
+version: "1.0.0"
+
+# Contexto reusable de las fases de TRABAJO. Compone el material gobernado que
+# toda fase necesita tener delante, y la presentacion con la que se le entrega.
+#
+# No lleva skills, ni permisos, ni validators, ni gate: eso lo decide el
+# workflow, y una definicion de contexto no tiene donde escribirlo.
+
+materials:
+  - id: glosario-agenda
+    version: "1.0.0"
+  - id: criterios-de-error
+    version: "1.0.0"
+  - id: plantilla-adr
+    version: "1.0.0"
+
+sections:
+  - id: encargo
+    title: De donde sale el encargo
+    body: |
+      El encargo completo esta en `OBJETIVO.md`, en la raiz del workspace. Leelo
+      entero antes de empezar: contiene la descripcion, los requerimientos, los
+      Constrains, las asunciones y las reglas de trabajo.
+
+      Ese fichero es la entrada y no se modifica. Si algo de el resulta imposible
+      o equivocado, no lo corrijas: anotalo donde la fase te diga y sigue con el
+      resto. Una persona decidira.
+
+  - id: confinamiento
+    title: Donde puedes trabajar
+    body: |
+      Trabajas dentro de un worktree de git y las herramientas de fichero estan
+      confinadas a el. Usa siempre rutas RELATIVAS.
+
+      No intentes leer ni escribir fuera del workspace: el intento se deniega y
+      tumba la fase. Todo lo que necesitas esta en este directorio y por debajo.
+
+  - id: como-se-cierra
+    title: Que significa cerrar una fase
+    body: |
+      Una fase cierra cuando deja su documentacion escrita y sus comprobaciones
+      en verde, y cuando una persona firma. Tu no cierras nada: preparas la
+      evidencia.
+
+      Si no puedes completar algo, escribelo como pregunta abierta con su nombre
+      en vez de rellenarlo. Un hueco declarado se puede atender; uno rellenado
+      con contenido plausible no lo ve nadie nunca mas.

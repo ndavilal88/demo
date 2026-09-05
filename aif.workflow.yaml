@@ -1,325 +1,573 @@
 workflow:
   version: 1
-  name: agenda-personal
+  name: agenda-doc-as-code
 
-# Pipeline de ingenieria AI-First.
+# AGENDA PERSONAL — entrega AI-First con Doc-as-Code, prototipo HTML5-first,
+# seguridad en dos tiempos y doble check en cada fase.
 #
-#                         ┌── arquitectura ───┐
-#                         │                   │
-#  requisitos ────────────┼── ux ─────────────┼── implementacion
-#                         │                   │
-#                         └── seguridad ──────┘
-#                                                     │
-#                                                     ▼
-#                                                  pruebas
-#                                                     │
-#                         ┌───────────────────────────┼─────────┐
-#                         ▼                           ▼         ▼
-#                   performance          seguridad-revision   docs
-#                         └───────────────────────────┬─────────┘
-#                                                     ▼
-#                                                  entrega
+# Deriva de las nueve fases de `project-template` (0 iniciacion .. 8 operacion) y
+# cambia cuatro cosas a proposito:
 #
-# El DAG es real: lo declara `requires`, no el orden del fichero. AIF Local
-# ejecuta UNA fase a la vez y toma la primera lista en orden de declaracion
-# (D15), asi que los dos abanicos se recorren de arriba abajo — pero ninguna
-# fase empieza sin que TODAS las suyas esten aprobadas.
+#   1. DOC-AS-CODE. La documentacion no es un entregable del final: es el
+#      artefacto de CADA fase. Vive en `docs/`, se versiona con el codigo, los
+#      diagramas van en bloques mermaid dentro del markdown, y la valida el mismo
+#      pipeline. Una fase que no deja documento no ha cerrado.
 #
-# Hay DOS fases de seguridad porque son dos trabajos distintos: `seguridad`
-# modela amenazas sobre el diseno, antes de que exista codigo, y
-# `seguridad-revision` revisa el codigo que ya existe. Los ids son unicos, de
-# ahi el nombre largo del segundo.
+#   2. PROTOTIPO HTML5-FIRST. La fase 2 de UX/UI produce un prototipo NAVEGABLE
+#      que se abre con doble clic y se ve como el producto real, con datos
+#      realistas y con los estados incomodos incluidos. No una maqueta gris: un
+#      wireframe no provoca las preguntas que hay que responder antes de decidir.
 #
-# EL AVISO DEL WORKSPACE va en las diez fases y no es decorativo: el agente
+#   3. SEGURIDAD EN DOS TIEMPOS. Son dos trabajos distintos y estan en dos
+#      momentos: `amenazas` modela sobre el DISENO —cuando ya hay prototipo que
+#      ensena la superficie real— y `endurecimiento` revisa el CODIGO que ya
+#      existe, comprobando con fichero y linea que cada mitigacion prometida
+#      esta puesta.
+#
+#   4. DOBLE CHECK EN CADA FASE. Toda fase de trabajo tiene su fase de REVISION,
+#      con otro encargo y OTROS PERMISOS: el revisor tiene `Write` para su
+#      informe pero NO tiene `Edit`, asi que no puede tocar lo que revisa.
+#      Encontrar y arreglar son dos actos; juntarlos es como se cuelan los
+#      arreglos que nadie revisa.
+#
+# EL ENCARGO ESTA EN `OBJETIVO.md`, en la raiz. Todas las fases lo leen y ninguna
+# lo modifica. Es la unica fuente de la descripcion, los requerimientos, los
+# Constrains, las asunciones y las reglas.
+#
+# EL DAG ES LINEAL A PROPOSITO. Un doble check que se pueda adelantar no es un
+# doble check: cada revision depende de su fase y la fase siguiente depende de la
+# revision. Nada avanza sin dos firmas humanas.
+#
+# EL AVISO DEL WORKSPACE VA EN LAS DIECIOCHO FASES y no es decorativo: el agente
 # trabaja en un worktree y el perfil hermetico confina las herramientas de
-# fichero a el. Sin decirlo, el agente sale a explorar la raiz del proyecto, se
-# le deniega y la fase muere — medido, seis intentos seguidos.
+# fichero a el. Sin decirlo, sale a explorar la raiz del proyecto, se le deniega
+# y la fase muere — medido, seis intentos seguidos.
+#
+# PERMISOS: el techo `local-mvp` v1 autoriza Read, Write, Edit, Glob, Grep,
+# NotebookEdit y TodoWrite. NO hay `Bash`: una fase que lo pidiera haria el
+# workflow inadoptable. Lo que hay que ejecutar lo ejecutan los validators, que
+# son procesos de AIF y no estan bajo ese techo.
 
 phases:
+
+  # ================================================================= 1
   - id: requisitos
     requires: []
     runtime: claude-code
     instructions: |
-      Define QUE hay que construir, sin decidir todavia COMO.
+      Trabaja SOLO dentro de tu workspace, con rutas RELATIVAS. Es un worktree de
+      git y las herramientas de fichero estan confinadas a el: salir se deniega y
+      tumba la fase.
 
-      El producto es una AGENDA PERSONAL: una aplicacion en Node.js para
-      apuntar citas —fecha, hora, titulo y notas—, con una interfaz visual en el
-      navegador que las muestra por dia.
+      Lee `OBJETIVO.md` entero. Es el encargo y no se modifica.
 
-      Escribe `docs/requisitos.md` con estas secciones, en este orden:
-        ## Problema
-        ## Actores          (quien usa la agenda y para que)
-        ## Requisitos funcionales     (numerados RF-1, RF-2, ...)
-        ## Requisitos no funcionales  (numerados RNF-1, RNF-2, ...)
-        ## Fuera de alcance
+      Convierte ese encargo en documentacion trabajable:
 
-      Como minimo tiene que poder: anadir una cita, listar las de un dia,
-      buscar por texto y borrar una. Y decir que pasa con los casos feos: dos
-      citas a la misma hora, una fecha que no existe, un titulo vacio.
+      1. `docs/README.md` — indice de la documentacion, con enlaces relativos a
+         cada documento que exista. Es el mapa y se actualiza en cada fase.
+      2. `docs/01-requisitos/requisitos.md` — los RF y RNF de `OBJETIVO.md`
+         desarrollados: cada uno con su identificador tal cual, su intencion en
+         una frase, y su criterio de aceptacion como dado / cuando / entonces.
+         Anade los que falten para cubrir las cuatro operaciones y la vista,
+         numerando a continuacion.
+      3. `docs/01-requisitos/casos-feos.md` — que pasa con dos citas a la misma
+         hora, una fecha que no existe, un titulo vacio, un fichero de datos
+         corrupto y uno que no esta. Cada caso con su comportamiento esperado.
+      4. `docs/01-requisitos/huecos.md` — lo que se sabe que NO se sabe. Un hueco
+         declarado vale mas que un requisito inventado.
 
-      RESTRICCIONES QUE MANDAN sobre todo lo demas, y que tienen que quedar
-      escritas en los requisitos no funcionales:
-        - Solo la biblioteca estandar de Node. Cero dependencias, cero npm install.
-        - La interfaz es un fichero HTML estatico que se abre con doble clic.
-        - Nada de red ni de nube: las citas viven en un fichero JSON del proyecto.
-
+      Cada documento abre con front-matter YAML: id, fase, estado, actualizado.
       No escribas codigo en esta fase.
-
-      TODO LO QUE NECESITAS ESTA EN ESTE DIRECTORIO Y POR DEBAJO. No mires ni
-      escribas fuera de el: las herramientas de fichero estan confinadas aqui, y
-      un intento de salir se deniega y tumba la fase. Usa siempre rutas
-      RELATIVAS.
-    permissions: [Read, Write, Edit, Glob, Grep]
-    validators: [hay-requisitos]
+    permissions: [Read, Write, Edit, Glob, Grep, TodoWrite]
+    skills: [doc-as-code, trazabilidad, escritura-tecnica]
+    contexts: [encargo-agenda]
+    validators: [docs-estructura, trazabilidad-ids, enlaces-vivos]
     gate:
       human: true
 
+  - id: revision-requisitos
+    runtime: claude-code
+    instructions: |
+      Trabaja SOLO dentro de tu workspace, con rutas RELATIVAS.
+      NO tienes `Edit`: no puedes corregir lo que revisas, y es deliberado.
+
+      Revisa `docs/01-requisitos/` contra `OBJETIVO.md` y escribe UN documento
+      nuevo: `docs/revisiones/01-requisitos.md`.
+
+      Busca: criterios de aceptacion que no se pueden comprobar, requisitos que
+      en realidad son dos, identificadores duplicados o saltados, un "debe ser
+      rapido" haciendose pasar por RNF, requisitos que contradicen los Constrains
+      del objetivo, y casos feos sin comportamiento definido.
+
+      Termina con "Lo que NO he comprobado".
+    permissions: [Read, Write, Glob, Grep]
+    skills: [doble-check, trazabilidad]
+    contexts: [revision-adversarial]
+    validators: [revision-solo-anade, hay-revision]
+    gate:
+      human: true
+
+  # ==================================================== 2 · UX/UI, HTML5-first
+  - id: prototipo
+    runtime: claude-code
+    instructions: |
+      Trabaja SOLO dentro de tu workspace, con rutas RELATIVAS.
+
+      Construye el prototipo NAVEGABLE de la agenda. Tiene que verse como el
+      producto real, no como una maqueta: sobre un wireframe gris no se puede
+      decidir nada.
+
+      1. `prototipo/index.html` — HTML5 completo, autocontenido, que se abre con
+         DOBLE CLIC. Sin servidor, sin CDN, sin fuentes remotas, sin conexion.
+         El CSS y el JS van dentro o al lado.
+      2. Con DATOS REALISTAS, nunca de relleno: citas con titulos que alguien
+         escribiria de verdad, y los casos incomodos incluidos — dos citas a la
+         misma hora, un titulo largo que no cabe, un dia vacio.
+      3. NAVEGABLE: los estados reales se alcanzan pulsando. Como minimo el dia
+         con citas, el dia vacio y el error de fecha invalida. Los estados que no
+         son "todo bien" tambien se prototipan: son la mitad del uso real y se
+         dejan siempre para cuando ya no hay tiempo.
+      4. `docs/02-prototipo/decisiones-ux.md` — que se decide con este prototipo,
+         que alternativas se descartaron y por que, y LO QUE EL PROTOTIPO NO
+         RESUELVE. Sin ese documento el prototipo no se puede revisar: solo se
+         puede opinar sobre el.
+
+      Si el prototipo y los Constrains de `OBJETIVO.md` se contradicen, mandan los
+      Constrains y la contradiccion se escribe.
+    permissions: [Read, Write, Edit, Glob, Grep, TodoWrite]
+    skills: [prototipo-html5, doc-as-code, escritura-tecnica]
+    contexts: [encargo-agenda]
+    validators: [docs-estructura, hay-prototipo, enlaces-vivos]
+    gate:
+      human: true
+
+  - id: revision-prototipo
+    runtime: claude-code
+    instructions: |
+      Trabaja SOLO dentro de tu workspace, con rutas RELATIVAS. NO tienes `Edit`.
+
+      Revisa `prototipo/` y `docs/02-prototipo/`, y escribe
+      `docs/revisiones/02-prototipo.md`.
+
+      Un prototipo se revisa buscando lo que PROMETE y no se va a poder cumplir:
+      pantallas que ensenan datos que ningun RF- produce, acciones que los
+      Constrains no permiten, y estados que no se pueden alcanzar pulsando.
+
+      Comprueba ademas: que se abre sin red (busca cualquier http:// en el
+      fichero), que los datos de ejemplo incluyen los casos incomodos y no solo
+      los bonitos, que existen el dia vacio y el error, y que
+      `decisiones-ux.md` dice lo que el prototipo NO resuelve.
+
+      Y recorre cada RF- de la fase 1: si un requisito no tiene ninguna pantalla,
+      es un hallazgo; si una pantalla no responde a ningun requisito, tambien.
+
+      Termina con "Lo que NO he comprobado".
+    permissions: [Read, Write, Glob, Grep]
+    skills: [doble-check, prototipo-html5]
+    contexts: [revision-adversarial]
+    validators: [revision-solo-anade, hay-revision]
+    gate:
+      human: true
+
+  # ========================================================= 3 · seguridad (diseno)
+  - id: amenazas
+    runtime: claude-code
+    instructions: |
+      Trabaja SOLO dentro de tu workspace, con rutas RELATIVAS.
+
+      Modela amenazas sobre el DISENO, ahora que el prototipo ensena la
+      superficie real: que datos se muestran, que teclea la persona y que se
+      guarda. Que la agenda sea local y pequena no la deja sin superficie.
+
+      Escribe `docs/03-seguridad/modelo-de-amenazas.md`:
+
+      1. Que se protege y de quien. Nombra la FRONTERA DE CONFIANZA: quien esta
+         DENTRO y quien FUERA. Sin eso, "seguro" no significa nada. Ojo: en este
+         proyecto el usuario del sistema esta DENTRO.
+      2. Amenazas por categoria (suplantacion, manipulacion, repudio, fuga,
+         denegacion, elevacion), cada una con su vector CONCRETO aqui. Piensa al
+         menos en: un `citas.json` manipulado a mano, un titulo con HTML que la
+         vista pinta sin escapar, una ruta que se sale del proyecto, una
+         escritura interrumpida, y un fichero enorme que agota memoria.
+      3. Por cada amenaza: la mitigacion prevista y su identificador SEC-1,
+         SEC-2... para poder trazarla despues hasta el codigo.
+      4. "Lo que NO se mitiga y por que" — riesgos aceptados con su motivo. Es el
+         apartado mas valioso del documento.
+
+      Y `docs/03-seguridad/datos-sensibles.md`: que datos toca la agenda, de que
+      clase, donde viven y cuanto tiempo.
+    permissions: [Read, Write, Edit, Glob, Grep, TodoWrite]
+    skills: [seguridad-por-diseno, doc-as-code, escritura-tecnica]
+    contexts: [encargo-agenda]
+    validators: [docs-estructura, hay-amenazas, sin-secretos]
+    gate:
+      human: true
+
+  - id: revision-amenazas
+    runtime: claude-code
+    instructions: |
+      Trabaja SOLO dentro de tu workspace, con rutas RELATIVAS. NO tienes `Edit`.
+
+      Revisa `docs/03-seguridad/` y escribe `docs/revisiones/03-amenazas.md`.
+
+      Un modelo de amenazas se revisa buscando lo que NO esta: categorias sin una
+      sola amenaza, mitigaciones que son deseos ("se validara la entrada") en vez
+      de mecanismos, una frontera de confianza que no dice quien queda fuera, y
+      riesgos aceptados sin decir quien los acepta.
+
+      Contrasta cada RF- y cada pantalla del prototipo contra el modelo: algo que
+      escribe en disco o que pinta texto del usuario y no aparece en ninguna
+      amenaza es un hueco. Comprueba en particular el HTML inyectado en un
+      titulo, que el prototipo ya deja ver.
+
+      Termina con "Lo que NO he comprobado".
+    permissions: [Read, Write, Glob, Grep]
+    skills: [doble-check, seguridad-por-diseno]
+    contexts: [revision-adversarial]
+    validators: [revision-solo-anade, hay-revision]
+    gate:
+      human: true
+
+  # ================================================================= 4
   - id: arquitectura
-    requires: [requisitos]
     runtime: claude-code
     instructions: |
-      Lee `docs/requisitos.md` y decide COMO se construye.
+      Trabaja SOLO dentro de tu workspace, con rutas RELATIVAS.
 
-      Escribe `docs/arquitectura.md` con:
-        ## Componentes            (que ficheros existiran y de que se ocupa cada uno)
-        ## Modelo de una cita     (la forma exacta, campo a campo, con su tipo)
-        ## Operaciones            (anadir, listar por dia, buscar, borrar)
-        ## Almacenamiento         (como se guarda y que pasa si el fichero no existe)
-        ## Estado para la interfaz (el JSON que la interfaz va a leer)
+      Decide el COMO, y escribelo como codigo:
 
-      La estructura de ficheros que hay que respetar es esta:
-        src/agenda.js       las reglas: anadir, listar, buscar, borrar, validar
-        src/almacen.js      leer y escribir datos/agenda.json
-        src/main.js         siembra unas citas de ejemplo y escribe web/eventos.json
-        web/index.html      la interfaz visual
-        web/eventos.json    lo que main.js produce y la interfaz lee
+      1. `docs/04-arquitectura/contexto.md` y `docs/04-arquitectura/piezas.md` —
+         los dos primeros niveles de C4, con los diagramas en bloques mermaid
+         dentro del propio markdown. Nada de imagenes: un diagrama que no se
+         puede diff-ear no es doc-as-code.
+      2. Un ADR por decision real en `docs/adr/`, numerados desde ADR-001, con la
+         plantilla del material `plantilla-adr`. Como minimo: la forma del
+         fichero de datos, la estrategia de escritura segura, y como se comunican
+         la herramienta y la vista. Una decision sin alternativas descartadas no
+         es un ADR.
+      3. `docs/04-arquitectura/trazabilidad.md` — que pieza cubre que RF- y que
+         SEC-.
 
-      No escribas codigo todavia.
-
-      TODO LO QUE NECESITAS ESTA EN ESTE DIRECTORIO Y POR DEBAJO. No mires ni
-      escribas fuera de el: las herramientas de fichero estan confinadas aqui, y
-      un intento de salir se deniega y tumba la fase. Usa siempre rutas
-      RELATIVAS.
-    permissions: [Read, Write, Edit, Glob, Grep]
-    validators: [hay-arquitectura]
+      Trata primero los hallazgos de `docs/revisiones/03-amenazas.md`.
+      No escribas codigo de produccion todavia.
+    permissions: [Read, Write, Edit, Glob, Grep, TodoWrite]
+    skills: [doc-as-code, trazabilidad, escritura-tecnica]
+    contexts: [encargo-agenda]
+    validators: [docs-estructura, trazabilidad-ids, enlaces-vivos]
     gate:
       human: true
 
-  - id: ux
-    requires: [requisitos]
+  - id: revision-arquitectura
     runtime: claude-code
     instructions: |
-      Lee `docs/requisitos.md` y define QUE VE la persona.
+      Trabaja SOLO dentro de tu workspace, con rutas RELATIVAS. NO tienes `Edit`.
 
-      Escribe `docs/ux.md` con:
-        ## Que tiene que entender de un vistazo
-        ## Pantalla       (que hay en la pagina, de arriba abajo)
-        ## Estados        (cargando, dia sin citas, dia con citas, error al cargar)
-        ## Accesibilidad  (contraste, tamanos, que funcione sin raton)
+      Revisa `docs/04-arquitectura/` y `docs/adr/`, y escribe
+      `docs/revisiones/04-arquitectura.md`.
 
-      La interfaz es un solo `web/index.html` sin dependencias ni build: HTML,
-      CSS y JavaScript en el mismo fichero. Describela con ese limite puesto.
+      Busca: ADRs que describen lo que se hizo en vez de decidir algo, decisiones
+      sin alternativa considerada, diagramas que no coinciden con el texto de al
+      lado, piezas que no cubren ningun requisito, y requisitos que no cubre
+      ninguna pieza. Las dos ultimas son la misma pregunta desde los dos lados y
+      hay que hacerla en los dos sentidos.
 
-      Piensa en lo aburrido y necesario: como se ve una cita, como se distingue
-      la de ahora de la de la semana que viene, y que pasa cuando no hay ninguna.
+      Comprueba que la arquitectura respeta los Constrains de `OBJETIVO.md` y que
+      sostiene lo que el prototipo ya ensena.
 
-      No escribas el HTML todavia: aqui se decide que se ve, no como se codifica.
-
-      TODO LO QUE NECESITAS ESTA EN ESTE DIRECTORIO Y POR DEBAJO. No mires ni
-      escribas fuera de el: las herramientas de fichero estan confinadas aqui, y
-      un intento de salir se deniega y tumba la fase. Usa siempre rutas
-      RELATIVAS.
-    permissions: [Read, Write, Edit, Glob, Grep]
-    validators: [hay-ux]
+      Termina con "Lo que NO he comprobado".
+    permissions: [Read, Write, Glob, Grep]
+    skills: [doble-check, trazabilidad]
+    contexts: [revision-adversarial]
+    validators: [revision-solo-anade, hay-revision]
     gate:
       human: true
 
-  - id: seguridad
-    requires: [requisitos]
+  # ============================================================= 5 · SDD
+  - id: sdd
     runtime: claude-code
     instructions: |
-      Lee `docs/requisitos.md` y modela las amenazas ANTES de que exista codigo.
+      Trabaja SOLO dentro de tu workspace, con rutas RELATIVAS.
 
-      Escribe `docs/amenazas.md` con:
-        ## Superficie    (por donde entran datos: el fichero de citas, lo que se teclea, el navegador)
-        ## Amenazas      (una por seccion, numeradas A-1, A-2, ...)
-        ## Mitigaciones  (cada una citando la amenaza que cierra)
-        ## Lo que NO se protege   (dicho a proposito, no escondido)
+      Escribe el SDD — la especificacion tecnica EJECUTABLE — en `docs/05-sdd/`:
 
-      Al menos estas tienen que estar tratadas, porque son las que esta agenda
-      se puede encontrar de verdad:
-        - una cita con campos que nadie valida, o con una fecha que no existe
-        - `datos/agenda.json` corrupto o con contenido que no escribio la app
-        - texto de una cita que acaba dentro del HTML de la interfaz
+      1. `datos.md` — la forma exacta de `datos/citas.json`: campos, tipos,
+         formato de fecha y hora, como se genera el id de una cita, invariantes,
+         y un ejemplo completo con tres citas.
+      2. `cli.md` — cada comando de la herramienta con su sintaxis, argumentos,
+         salida en exito, salida en error y CODIGO DE SALIDA. Ejemplos literales
+         de entrada y salida, no descripciones de ellos.
+      3. `vista.md` — que lee la vista, como lo pinta, y que hace cuando no hay
+         citas o el fichero no esta. Deriva del prototipo ya firmado: si algo
+         cambia respecto a el, se dice aqui y se explica.
 
-      Prohibido en el codigo que vendra despues, y esta fase tiene que dejarlo
-      escrito: eval, new Function, child_process y cualquier llamada de red.
+      Un SDD es ejecutable cuando alguien puede escribir el test leyendolo y sin
+      preguntar nada. Si un apartado no llega a ese nivel, marcalo como ABIERTO
+      en vez de redondearlo.
 
-      TODO LO QUE NECESITAS ESTA EN ESTE DIRECTORIO Y POR DEBAJO. No mires ni
-      escribas fuera de el: las herramientas de fichero estan confinadas aqui, y
-      un intento de salir se deniega y tumba la fase. Usa siempre rutas
-      RELATIVAS.
-    permissions: [Read, Write, Edit, Glob, Grep]
-    validators: [hay-amenazas]
+      Cada regla lleva el RF- que la origina.
+    permissions: [Read, Write, Edit, Glob, Grep, TodoWrite]
+    skills: [doc-as-code, trazabilidad, escritura-tecnica]
+    contexts: [encargo-agenda]
+    validators: [docs-estructura, trazabilidad-ids, enlaces-vivos]
     gate:
       human: true
 
-  - id: implementacion
-    requires: [arquitectura, ux, seguridad]
+  - id: revision-sdd
     runtime: claude-code
     instructions: |
-      Construye la agenda siguiendo `docs/arquitectura.md`, `docs/ux.md` y
-      `docs/amenazas.md`.
+      Trabaja SOLO dentro de tu workspace, con rutas RELATIVAS. NO tienes `Edit`.
 
-      Escribe:
-        src/agenda.js     anadir, listar por dia, buscar, borrar y VALIDAR
-        src/almacen.js    leer y escribir datos/agenda.json
-        src/main.js       que al ejecutarse escribe `web/eventos.json`
-        web/index.html    la interfaz visual, un solo fichero
+      Revisa `docs/05-sdd/` y escribe `docs/revisiones/05-sdd.md`.
 
-      REGLAS QUE NO SE NEGOCIAN:
-        - Solo biblioteca estandar de Node. Ningun paquete externo.
-        - Nada de eval, new Function, child_process ni red.
-        - La interfaz pinta lo que lee de `web/eventos.json` con textContent,
-          nunca con innerHTML sobre datos.
-        - `node src/main.js` tiene que terminar solo, sin quedarse esperando, y
-          funcionar aunque `datos/agenda.json` no exista todavia.
+      La prueba de fuego: coge tres reglas e intenta escribir su test SOLO con lo
+      que dice el documento. Todo lo que tengas que suponer es un hueco, y va al
+      informe con el nombre del apartado y lo que tuviste que inventar.
 
-      TU NO PUEDES EJECUTAR NADA en esta fase: no tienes shell. Escribe el codigo
-      como si fuera a correr — de ejecutarlo se encarga la comprobacion del gate.
+      Comprueba ademas que cada caso feo de la fase 1 tiene su comportamiento
+      especificado, con su codigo de salida, y que el SDD no contradice el
+      prototipo firmado sin explicarlo.
 
-      TODO LO QUE NECESITAS ESTA EN ESTE DIRECTORIO Y POR DEBAJO. No mires ni
-      escribas fuera de el: las herramientas de fichero estan confinadas aqui, y
-      un intento de salir se deniega y tumba la fase. Usa siempre rutas
-      RELATIVAS.
-    permissions: [Read, Write, Edit, Glob, Grep]
-    validators: [compila-agenda]
+      Termina con "Lo que NO he comprobado".
+    permissions: [Read, Write, Glob, Grep]
+    skills: [doble-check, trazabilidad]
+    contexts: [revision-adversarial]
+    validators: [revision-solo-anade, hay-revision]
     gate:
       human: true
 
-  - id: pruebas
-    requires: [implementacion]
+  # ================================================================= 6
+  - id: construccion
     runtime: claude-code
     instructions: |
-      Escribe pruebas de verdad para lo que hay en `src/`, con el runner que trae
-      Node: `node:test` y `node:assert/strict`.
+      Trabaja SOLO dentro de tu workspace, con rutas RELATIVAS.
 
-      Deja los ficheros en `test/`, con nombre `*.test.js`. Cubre al menos:
-        - una cita valida se anade y aparece al listar su dia
-        - una cita con fecha imposible o titulo vacio se RECHAZA
-        - buscar por texto encuentra la que es y no las demas
-        - borrar quita solo esa, y borrar algo que no existe no revienta
-        - leer un `datos/agenda.json` que no existe da una agenda vacia
+      Implementa la agenda segun `docs/05-sdd/`:
 
-      Que las pruebas FALLEN si el codigo esta mal es el objetivo: no escribas
-      pruebas que pasen sin mirar nada. Si al escribirlas descubres un fallo en
-      `src/`, arreglalo.
+      - `src/` con la herramienta de linea de comandos en Node.js, biblioteca
+        estandar UNICAMENTE.
+      - `web/index.html` con la vista real, derivada del prototipo firmado.
+        Escapa siempre el texto que venga del fichero de datos.
+      - `datos/citas.json` con tres citas de ejemplo.
+      - `package.json` sin ninguna dependencia.
+      - `test/` con SUS PROPIAS PRUEBAS, en los dos niveles que corresponden a
+        esta fase:
+          `test/unidad/`      — cada funcion hace lo que dice. Validacion de
+                                fecha, orden por hora, generacion de id.
+          `test/integracion/` — dos piezas se entienden entre si. Leer y escribir
+                                el fichero de datos de ida y vuelta, y que una
+                                escritura fallida lo deje intacto.
+        Ficheros `*.test.js`, ejecutor de Node (`node --test`), sin instalar nada.
 
-      Tampoco aqui puedes ejecutar: las corre el gate con `node --test`, que
-      descubre `test/*.test.js` el solo.
+      Una fase deja el codigo Y las pruebas que lo sostienen. Codigo sin prueba
+      no ha cerrado: la prueba es parte del entregable, no de la fase siguiente.
 
-      TODO LO QUE NECESITAS ESTA EN ESTE DIRECTORIO Y POR DEBAJO. No mires ni
-      escribas fuera de el: las herramientas de fichero estan confinadas aqui, y
-      un intento de salir se deniega y tumba la fase. Usa siempre rutas
-      RELATIVAS.
-    permissions: [Read, Write, Edit, Glob, Grep]
-    validators: [pasan-pruebas]
+      Cada unidad que cubre un requisito lleva `@trace RF-n`. Cada mitigacion
+      lleva `@trace SEC-n`. Es lo que despues permite comprobar la trazabilidad
+      sin leerlo todo.
+
+      Y `docs/06-construccion/decisiones.md`: lo que tuviste que decidir sobre la
+      marcha y que el SDD no decia. No es un diario, es la entrada de la proxima
+      revision. Si algo del SDD resulta imposible o equivocado, NO lo arregles en
+      silencio: escribelo ahi y sigue con el resto.
+    permissions: [Read, Write, Edit, Glob, Grep, TodoWrite]
+    skills: [doc-as-code, trazabilidad, escritura-tecnica]
+    contexts: [encargo-agenda]
+    validators: [docs-estructura, trazabilidad-ids, sin-secretos, sin-dependencias, pasan-pruebas]
     gate:
       human: true
 
-  - id: performance
-    requires: [pruebas]
+  - id: revision-construccion
     runtime: claude-code
     instructions: |
-      Mide, no opines.
+      Trabaja SOLO dentro de tu workspace, con rutas RELATIVAS. NO tienes `Edit`.
 
-      Escribe `bench/bench.js`: solo biblioteca estandar, que llene una agenda
-      con muchas citas —miles—, mida con `performance.now()` cuanto tarda
-      listar un dia y buscar por texto, y escriba el resultado por stdout. Tiene
-      que terminar solo y salir con codigo 0.
+      Revisa `src/`, `web/` y `test/` contra `docs/05-sdd/`, y escribe
+      `docs/revisiones/06-construccion.md`.
 
-      Escribe `docs/performance.md` con:
-        ## Que se mide
-        ## Como se mide   (el comando exacto: node bench/bench.js)
-        ## Resultados     (los numeros que espera ver quien lo ejecute)
-        ## Que haria falta para ir mas rapido
+      Busca: reglas especificadas que no estan implementadas, codigo que hace
+      cosas que nadie especifico, `@trace` que apuntan a requisitos que no
+      existen, requisitos sin ningun `@trace`, pruebas que pasan sin comprobar
+      nada, y cualquier import de algo que no sea la stdlib de Node.
 
-      TODO LO QUE NECESITAS ESTA EN ESTE DIRECTORIO Y POR DEBAJO. No mires ni
-      escribas fuera de el: las herramientas de fichero estan confinadas aqui, y
-      un intento de salir se deniega y tumba la fase. Usa siempre rutas
-      RELATIVAS.
-    permissions: [Read, Write, Edit, Glob, Grep]
-    validators: [mide-performance]
+      Comprueba que la fase dejo SUS pruebas en los dos niveles que le tocan:
+      test/unidad/ y test/integracion/. Un directorio vacio es peor que uno
+      ausente, porque parece cubierto.
+
+      Comprueba en particular que la vista escapa el texto del fichero de datos:
+      es la mitigacion mas facil de olvidar y la mas visible cuando falta.
+
+      Termina con "Lo que NO he comprobado".
+    permissions: [Read, Write, Glob, Grep]
+    skills: [doble-check, trazabilidad]
+    contexts: [revision-adversarial]
+    validators: [revision-solo-anade, hay-revision]
     gate:
       human: true
 
-  - id: seguridad-revision
-    requires: [pruebas]
+  # ================================================================= 7
+  - id: verificacion
     runtime: claude-code
     instructions: |
-      Vuelve a `docs/amenazas.md` y revisa contra el el codigo que YA existe.
+      Trabaja SOLO dentro de tu workspace, con rutas RELATIVAS.
 
-      Escribe `docs/seguridad-revision.md` con:
-        ## Amenaza por amenaza   (cita A-1, A-2, ... y di si esta cerrada, con el
-                                  fichero y la linea donde se ve)
-        ## Lo que encontre       (si no encontraste nada, dilo y explica que
-                                  buscaste; no inventes hallazgos)
-        ## Lo que sigue abierto
+      Cierra la verificacion con el nivel que falta: el de EXTREMO A EXTREMO.
 
-      Si encuentras algo, ARREGLALO en `src/` y dilo en el documento. Un informe
-      que describe un agujero sin cerrarlo no es una revision, es una nota.
+      1. `test/e2e/` — pruebas que LANZAN LA HERRAMIENTA como la lanza una
+         persona, con `child_process` de la stdlib: se ejecuta el comando real
+         contra un fichero de datos temporal, y se comprueban su salida, su
+         CODIGO DE SALIDA y el estado en que queda el fichero. No vale importar
+         la funcion y llamarla: eso ya es `test/integracion/` con otro nombre.
 
-      TODO LO QUE NECESITAS ESTA EN ESTE DIRECTORIO Y POR DEBAJO. No mires ni
-      escribas fuera de el: las herramientas de fichero estan confinadas aqui, y
-      un intento de salir se deniega y tumba la fase. Usa siempre rutas
-      RELATIVAS.
-    permissions: [Read, Write, Edit, Glob, Grep]
-    validators: [revision-seguridad]
+         Como minimo, un E2E por cada operacion (anadir, listar, buscar, borrar)
+         y uno por cada codigo de salida de `docs/05-sdd/cli.md`.
+
+         Para la vista, un E2E que la lea como fichero y compruebe que pinta las
+         citas del fichero de datos y que ESCAPA el texto: mete una cita con un
+         titulo que lleve HTML dentro y comprueba que no sale como etiqueta.
+
+      2. Amplia `test/unidad/` y `test/integracion/` hasta cubrir el criterio de
+         aceptacion de CADA RF- y cada caso feo de la fase 1.
+
+      3. `docs/07-verificacion/informe.md` — que se probo, que NO se probo, y por
+         que. Un informe que dice "todo verde" sin decir que quedo fuera del
+         alcance es un informe incompleto.
+
+      4. `docs/07-verificacion/cobertura.md` — la tabla con cuatro columnas:
+         requisito, nivel de prueba, fichero, y nombre del caso. Un requisito sin
+         fila es un requisito sin verificar, y hay que escribirlo asi en vez de
+         dejar la fila vacia.
+    permissions: [Read, Write, Edit, Glob, Grep, TodoWrite]
+    skills: [doc-as-code, trazabilidad, escritura-tecnica]
+    contexts: [encargo-agenda]
+    validators: [docs-estructura, trazabilidad-ids, enlaces-vivos, sin-dependencias, pruebas-por-nivel, pasan-pruebas]
     gate:
       human: true
 
-  - id: docs
-    requires: [pruebas]
+  - id: revision-verificacion
     runtime: claude-code
     instructions: |
-      Escribe el `README.md` que necesita alguien que llega hoy al proyecto:
-        ## Que es esto
-        ## Como se ejecuta   (los comandos exactos, incluido como abrir la interfaz)
-        ## Como esta hecho   (resumen corto, remitiendo a docs/arquitectura.md)
-        ## Como se prueba    (node --test)
+      Trabaja SOLO dentro de tu workspace, con rutas RELATIVAS. NO tienes `Edit`.
 
-      Los comandos que escribas tienen que ser los que de verdad funcionan con
-      los ficheros que hay. Un README con un comando que no existe es peor que no
-      tener README.
+      Revisa `test/` y `docs/07-verificacion/`, y escribe
+      `docs/revisiones/07-verificacion.md`.
 
-      TODO LO QUE NECESITAS ESTA EN ESTE DIRECTORIO Y POR DEBAJO. No mires ni
-      escribas fuera de el: las herramientas de fichero estan confinadas aqui, y
-      un intento de salir se deniega y tumba la fase. Usa siempre rutas
-      RELATIVAS.
-    permissions: [Read, Write, Edit, Glob, Grep]
-    validators: [hay-docs]
+      Busca lo que una tabla de cobertura esconde: pruebas que existen y no
+      afirman nada, un RF- marcado como cubierto por una prueba que comprueba
+      otra cosa, y casos feos con fila en la tabla y sin prueba real.
+
+      Coge dos filas de la cobertura y sigue el hilo hasta la asercion concreta.
+      Si no llegas, es un hallazgo.
+
+      Y mira el E2E con lupa: comprueba que lanza el proceso de verdad y que
+      afirma sobre el codigo de salida, no solo sobre el texto. Un E2E que
+      importa la funcion es una prueba de integracion disfrazada, y la cobertura
+      la estara contando dos veces.
+
+      Termina con "Lo que NO he comprobado".
+    permissions: [Read, Write, Glob, Grep]
+    skills: [doble-check, trazabilidad]
+    contexts: [revision-adversarial]
+    validators: [revision-solo-anade, hay-revision]
     gate:
       human: true
 
+  # ========================================================= 8 · seguridad (codigo)
+  - id: endurecimiento
+    runtime: claude-code
+    instructions: |
+      Trabaja SOLO dentro de tu workspace, con rutas RELATIVAS.
+
+      Segunda pasada de seguridad, esta vez sobre el CODIGO que existe.
+
+      Escribe `docs/08-endurecimiento/informe.md`:
+
+      1. Recorre CADA SEC- del modelo de amenazas y di DONDE esta mitigado, con
+         fichero y linea. Un SEC- sin sitio es una mitigacion que no ocurrio.
+      2. Revisa y corrige: texto del fichero de datos pintado sin escapar, rutas
+         construidas con entrada del usuario, escrituras que pueden dejar el JSON
+         a medias, lecturas sin tope de tamano, y mensajes de error que filtran
+         rutas absolutas de la maquina.
+      3. Anade las pruebas de las correcciones que hagas.
+
+      Y `docs/08-endurecimiento/riesgos-aceptados.md`: lo que queda sin mitigar,
+      con su motivo y quien tendria que decidirlo.
+    permissions: [Read, Write, Edit, Glob, Grep, TodoWrite]
+    skills: [seguridad-por-diseno, trazabilidad, doc-as-code]
+    contexts: [encargo-agenda]
+    validators: [docs-estructura, sin-secretos, trazabilidad-ids, sin-dependencias, pasan-pruebas]
+    gate:
+      human: true
+
+  - id: revision-endurecimiento
+    runtime: claude-code
+    instructions: |
+      Trabaja SOLO dentro de tu workspace, con rutas RELATIVAS. NO tienes `Edit`.
+
+      Revisa `docs/08-endurecimiento/` contra `src/` y `web/` y contra el modelo
+      de amenazas, y escribe `docs/revisiones/08-endurecimiento.md`.
+
+      Lo que hay que buscar aqui es distinto de las revisiones anteriores:
+      mitigaciones DECLARADAS que el codigo no hace. Ve al fichero y la linea que
+      el documento cita y comprueba que lo que dice esta ahi. Una mitigacion
+      afirmada y no implementada es peor que una ausente, porque nadie la va a
+      volver a mirar.
+
+      Termina con "Lo que NO he comprobado".
+    permissions: [Read, Write, Glob, Grep]
+    skills: [doble-check, seguridad-por-diseno]
+    contexts: [revision-adversarial]
+    validators: [revision-solo-anade, hay-revision]
+    gate:
+      human: true
+
+  # ================================================================= 9
   - id: entrega
-    requires: [performance, seguridad-revision, docs]
     runtime: claude-code
     instructions: |
-      Cierra el paquete. Escribe `docs/entrega.md` con:
-        ## Que se entrega      (la lista de ficheros, uno por linea)
-        ## Como se comprueba   (los comandos que cualquiera puede correr)
-        ## Estado de cada fase (requisitos, arquitectura, ux, seguridad,
-                                implementacion, pruebas, performance,
-                                seguridad-revision, docs — y que dejo cada una)
-        ## Riesgos que quedan abiertos
+      Trabaja SOLO dentro de tu workspace, con rutas RELATIVAS.
 
-      No adornes: si algo quedo a medias, esta es la fase en la que se dice.
+      Cierra la entrega:
 
-      TODO LO QUE NECESITAS ESTA EN ESTE DIRECTORIO Y POR DEBAJO. No mires ni
-      escribas fuera de el: las herramientas de fichero estan confinadas aqui, y
-      un intento de salir se deniega y tumba la fase. Usa siempre rutas
-      RELATIVAS.
-    permissions: [Read, Write, Edit, Glob, Grep]
-    validators: [listo-para-entregar]
+      1. `README.md` en la raiz — que es la agenda, como se usa en tres lineas, y
+         como se abre la vista. Escrito para alguien que llega sin contexto.
+      2. `docs/09-entrega/notas-de-version.md` — que hace esta version y que RF-
+         cubre.
+      3. `docs/09-entrega/runbook.md` — como se instala (no hay instalacion),
+         como se comprueba que funciona, donde viven los datos, como se hace una
+         copia y como se vuelve atras. El apartado de vuelta atras no es
+         opcional.
+      4. `docs/09-entrega/pendiente.md` — lo que queda abierto, cada punto con la
+         revision que lo origino.
+      5. `docs/README.md` al dia, con todo enlazado.
+
+      Comprueba el escape: retirado `.aif/`, el proyecto tiene que seguir
+      funcionando. Ninguna dependencia de la herramienta que lo construyo.
+    permissions: [Read, Write, Edit, Glob, Grep, TodoWrite]
+    skills: [doc-as-code, trazabilidad, escritura-tecnica]
+    contexts: [encargo-agenda]
+    validators: [docs-estructura, enlaces-vivos, trazabilidad-ids, sin-dependencias]
+    gate:
+      human: true
+
+  - id: revision-entrega
+    runtime: claude-code
+    instructions: |
+      Trabaja SOLO dentro de tu workspace, con rutas RELATIVAS. NO tienes `Edit`.
+
+      Ultima revision. Escribe `docs/revisiones/09-entrega.md`.
+
+      Recorre TODAS las revisiones anteriores de `docs/revisiones/` y comprueba,
+      hallazgo por hallazgo, si se resolvio o si sigue abierto sin constar en
+      `docs/09-entrega/pendiente.md`. Un hallazgo que desaparece sin resolverse
+      ni declararse es el fallo que esta plantilla existe para evitar: hazle una
+      tabla con tres columnas — hallazgo, estado, donde consta.
+
+      Comprueba tambien el escape y los Constrains de `OBJETIVO.md` uno a uno.
+
+      Termina con "Lo que NO he comprobado".
+    permissions: [Read, Write, Glob, Grep]
+    skills: [doble-check, trazabilidad]
+    contexts: [revision-adversarial]
+    validators: [revision-solo-anade, hay-revision, enlaces-vivos]
     gate:
       human: true
