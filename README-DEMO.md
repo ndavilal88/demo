@@ -89,12 +89,33 @@ aif material register --id criterios-de-error --version 1.0.0
 
 ```bat
 aif propose
-aif show   --proposal wfp_...  --revision 1
-aif adopt  --proposal wfp_...  --revision 1
+aif show --proposal wfp_... --revision 1
 ```
 
-`adopt` exige `--revision N` explícito: firmar «la última» sería firmar lo que
-haya en ese instante y no lo que has leído.
+**`aif show` es el pre-vuelo**: no solo enseña la revisión, dice exactamente qué
+impide adoptarla. Mientras falte algo, sale así:
+
+```
+NO SE PUEDE ADOPTAR: la fase "requisitos": el validator "docs-estructura" está en
+el proyecto pero nadie lo ha aprobado — un fichero en disco no es autoridad
+NO SE PUEDE ADOPTAR: el contexto "encargo-agenda": el material "criterios-de-error"
+no está aprobado — existir en el catálogo no es estar aprobado
+```
+
+Cuando el pre-vuelo esté limpio, `show` imprime el **digest de los contextos
+citados**, y ese digest hay que nombrarlo al firmar:
+
+```bat
+aif adopt --proposal wfp_... --revision 1 --contexto sha256:...
+```
+
+Dos exigencias, y las dos son la misma idea:
+
+- **`--revision N` explícito.** Firmar «la última» sería firmar lo que haya en ese
+  instante y no lo que has leído.
+- **`--contexto <digest>`.** Un contexto gobernado se cita por slug en el
+  workflow, pero lo que se firma son sus bytes. Nombrar el digest es lo que
+  distingue firmar de firmar a ciegas.
 
 ### 4. Ejecutar
 
